@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 from ..models import Product
 
@@ -60,7 +60,8 @@ class ProductHandler:
                 return f"The {product_data['name']} is priced at ${product_data['price']:.2f}."
 
             elif query_type == 'availability':
-                status = "is available" if product_data.get('in_stock', True) else "is currently out of stock"
+                in_stock = product_data.get('in_stock', product_data.get('stock', 0) > 0)
+                status = "is available" if in_stock else "is currently out of stock"
                 return f"The {product_data['name']} {status}."
 
             elif query_type == 'features':
@@ -81,6 +82,20 @@ class ProductHandler:
                 response = f"Product: {product_data['name']}\n"
                 response += f"Description: {product_data['description']}\n"
                 response += f"Price: ${product_data['price']:.2f}\n"
+                
+                # Add stock information if available
+                if 'stock' in product_data:
+                    response += f"Availability: {'In Stock' if product_data['stock'] > 0 else 'Out of Stock'}\n"
+                elif 'in_stock' in product_data:
+                    response += f"Availability: {'In Stock' if product_data['in_stock'] else 'Out of Stock'}\n"
+                
+                # Add SKU if available
+                if 'sku' in product_data:
+                    response += f"SKU: {product_data['sku']}\n"
+                
+                # Add category if available
+                if 'category' in product_data and product_data['category']:
+                    response += f"Category: {product_data['category']}\n"
                 
                 if product_data.get('features'):
                     response += "\nKey Features:\n"
@@ -111,10 +126,37 @@ class ProductHandler:
             logger.error(f"Error retrieving product data: {e}")
             return None
 
-    def handle_query(self, query: str) -> str:
-        """Main method to handle product-related queries"""
+    def detect_query_type_from_message(self, query: str) -> str:
+        """Identify what kind of information the user is asking for"""
+        query_lower = query.lower()
+        
+        for query_type, patterns in self.query_patterns.items():
+            if any(pattern in query_lower for pattern in patterns):
+                return query_type
+        
+        return 'description'  # Default to general description
+
+    def handle_query(self, query: str, product_data: Optional[Dict] = None) -> str:
+        """
+        Main method to handle product-related queries
+        
+        Args:
+            query: The user's query
+            product_data: Optional data about a specific product if already known
+        """
         try:
-            # Extract information from the query
+            # If we already have product data from context, use it
+            if product_data:
+                # Determine what specific information the user is asking about
+                query_info = {
+                    'query_type': self.detect_query_type_from_message(query),
+                    'product_name': product_data['name']
+                }
+                
+                logger.info(f"Using provided product context for {product_data['name']}")
+                return self.format_product_response(product_data, query_info)
+            
+            # Otherwise, extract product from query
             query_info = self.extract_info(query)
             
             if not query_info['product_name']:

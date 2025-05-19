@@ -4,120 +4,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Database Chatbot</title>
+    <title>AI Shopping Assistant</title>
+    <!-- Add Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Add Highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1d4ed8;
+            --background-color: #f8fafc;
+            --chat-bg: #ffffff;
+            --user-msg-bg: #e0f2fe;
+            --bot-msg-bg: #f1f5f9;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             line-height: 1.6;
             margin: 0;
             padding: 0;
-            background-color: #f5f5f5;
+            background-color: var(--background-color);
+            color: var(--text-color);
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+
+        .chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
         }
-        .chat-container {
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            height: 500px;
-            display: flex;
-            flex-direction: column;
-        }
-        .chat-header {
-            background-color: #4a6fa5;
-            color: white;
-            padding: 15px;
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-            text-align: center;
-        }
-        .chat-messages {
-            flex-grow: 1;
-            padding: 15px;
-            overflow-y: auto;
-        }
-        .message {
-            margin-bottom: 15px;
-            padding: 10px 15px;
-            border-radius: 20px;
-            max-width: 70%;
-        }
-        .user-message {
-            background-color: #e6f2ff;
-            margin-left: auto;
-            border-bottom-right-radius: 5px;
-        }
-        .bot-message {
-            background-color: #f0f0f0;
-            margin-right: auto;
-            border-bottom-left-radius: 5px;
-        }
-        .input-container {
-            display: flex;
-            padding: 15px;
-            border-top: 1px solid #e0e0e0;
-        }
-        #message-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-right: 10px;
-        }
-        #send-button {
-            padding: 10px 15px;
-            background-color: #4a6fa5;
+
+        .chat-button {
+            background-color: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
             cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
         }
+
+        .chat-button:hover {
+            transform: scale(1.1);
+        }
+
+        .chat-container {
+            display: none;
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 380px;
+            height: 600px;
+            background-color: var(--chat-bg);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            flex-direction: column;
+            z-index: 1000;
+        }
+
+        .chat-container.active {
+            display: flex;
+        }
+
+        .chat-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            border-top-left-radius: 1rem;
+            border-top-right-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin-bottom: 1.5rem;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .message-content {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            max-width: 80%;
+            position: relative;
+        }
+
+        .user-message .message-content {
+            background-color: var(--user-msg-bg);
+            margin-left: auto;
+            border-bottom-right-radius: 0.25rem;
+        }
+
+        .bot-message .message-content {
+            background-color: var(--bot-msg-bg);
+            margin-right: auto;
+            border-bottom-left-radius: 0.25rem;
+        }
+
+        .message-timestamp {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+            text-align: right;
+        }
+
+        .input-container {
+            display: flex;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--chat-bg);
+            border-bottom-left-radius: 1rem;
+            border-bottom-right-radius: 1rem;
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            margin-right: 0.75rem;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        #message-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        #send-button {
+            padding: 0.75rem 1.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+
         #send-button:hover {
-            background-color: #3a5982;
+            background-color: var(--secondary-color);
         }
+
         .typing-indicator {
             display: none;
-            margin-bottom: 15px;
+            padding: 1rem;
+            background-color: var(--bot-msg-bg);
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+            width: fit-content;
         }
+
         .typing-indicator span {
-            height: 10px;
-            width: 10px;
+            height: 0.5rem;
+            width: 0.5rem;
             float: left;
             margin: 0 1px;
-            background-color: #9E9EA1;
+            background-color: #94a3b8;
             display: block;
             border-radius: 50%;
             opacity: 0.4;
         }
-        .typing-indicator span:nth-of-type(1) {
-            animation: 1s blink infinite 0.3333s;
-        }
-        .typing-indicator span:nth-of-type(2) {
-            animation: 1s blink infinite 0.6666s;
-        }
-        .typing-indicator span:nth-of-type(3) {
-            animation: 1s blink infinite 0.9999s;
-        }
+
+        .typing-indicator span:nth-of-type(1) { animation: 1s blink infinite 0.3333s; }
+        .typing-indicator span:nth-of-type(2) { animation: 1s blink infinite 0.6666s; }
+        .typing-indicator span:nth-of-type(3) { animation: 1s blink infinite 0.9999s; }
+
         @keyframes blink {
-            50% {
-                opacity: 1;
-            }
+            50% { opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Markdown Styling */
+        .message-content {
+            overflow-wrap: break-word;
+        }
+
+        .message-content p {
+            margin: 0.5rem 0;
+        }
+
+        .message-content ul, .message-content ol {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .message-content code {
+            background-color: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+        }
+
+        .message-content pre {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+        }
+
+        .message-content blockquote {
+            border-left: 4px solid var(--primary-color);
+            margin: 0.5rem 0;
+            padding-left: 1rem;
+            color: #64748b;
+        }
+
+        .suggestions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .suggestion-chip {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .suggestion-chip:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .minimize-button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.5rem;
+            padding: 0;
+            margin-left: 1rem;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Database Chatbot</h1>
-        <div class="chat-container">
+    <div class="chat-widget">
+        <button class="chat-button" id="chat-toggle">💬</button>
+        <div class="chat-container" id="chat-container">
             <div class="chat-header">
-                <h2>Chat with your Database</h2>
+                <h2>AI Shopping Assistant</h2>
+                <div class="header-actions">
+                    <button id="clear-chat" style="background: none; border: none; color: white; cursor: pointer;">
+                        Clear
+                    </button>
+                    <button class="minimize-button" id="minimize-chat">−</button>
+                </div>
             </div>
             <div class="chat-messages" id="chat-messages">
                 <div class="message bot-message">
-                    Hi! I'm your database assistant. Ask me anything about products, FAQs, or orders.
+                    <div class="message-content">
+                        {% if product %}
+                            <p>👋 Hi! I'm your AI shopping assistant. Ask me anything about <strong>{{ product.name }}</strong>!</p>
+                            <div class="suggestions">
+                                <div class="suggestion-chip">What are the features?</div>
+                                <div class="suggestion-chip">Is it in stock?</div>
+                                <div class="suggestion-chip">Are there similar products?</div>
+                            </div>
+                        {% else %}
+                            <p>👋 Hi! I'm your AI shopping assistant. I can help you with:</p>
+                            <ul>
+                                <li>Finding products</li>
+                                <li>Answering questions about products</li>
+                                <li>Checking order status</li>
+                                <li>Providing recommendations</li>
+                            </ul>
+                            <div class="suggestions">
+                                <div class="suggestion-chip">What's new?</div>
+                                <div class="suggestion-chip">Best sellers</div>
+                                <div class="suggestion-chip">Track my order</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="message-timestamp">Just now</div>
                 </div>
                 <div class="typing-indicator" id="typing-indicator">
                     <span></span>
@@ -126,7 +314,7 @@
                 </div>
             </div>
             <div class="input-container">
-                <input type="text" id="message-input" placeholder="Type your message...">
+                <input type="text" id="message-input" placeholder="Ask me anything..." {% if initial_message %}value="{{ initial_message }}"{% endif %}>
                 <button id="send-button">Send</button>
             </div>
         </div>
@@ -134,17 +322,90 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const chatToggle = document.getElementById('chat-toggle');
+            const chatContainer = document.getElementById('chat-container');
+            const minimizeButton = document.getElementById('minimize-chat');
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             const chatMessages = document.getElementById('chat-messages');
             const typingIndicator = document.getElementById('typing-indicator');
+            const clearChatButton = document.getElementById('clear-chat');
+
+            // Store product ID if available
+            const productId = {% if product %}{{ product.id }}{% else %}null{% endif %};
+
+            // Toggle chat visibility
+            chatToggle.addEventListener('click', function() {
+                chatContainer.classList.toggle('active');
+                if (chatContainer.classList.contains('active')) {
+                    messageInput.focus();
+                }
+            });
+
+            // Minimize chat
+            minimizeButton.addEventListener('click', function() {
+                chatContainer.classList.remove('active');
+            });
+
+            // Initialize marked with options
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                highlight: function(code, language) {
+                    if (language && hljs.getLanguage(language)) {
+                        return hljs.highlight(code, { language }).value;
+                    }
+                    return code;
+                }
+            });
+
+            // Function to format timestamp
+            function formatTimestamp() {
+                const now = new Date();
+                return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
 
             // Function to add a new message to the chat
             function addMessage(message, isUser) {
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message');
                 messageElement.classList.add(isUser ? 'user-message' : 'bot-message');
-                messageElement.textContent = message;
+
+                const contentElement = document.createElement('div');
+                contentElement.classList.add('message-content');
+                
+                // Parse markdown for bot messages
+                if (!isUser) {
+                    contentElement.innerHTML = marked.parse(message);
+                    
+                    // Add suggestion chips if they're in the message
+                    const suggestions = message.match(/\[suggestion:(.*?)\]/g);
+                    if (suggestions) {
+                        const suggestionsDiv = document.createElement('div');
+                        suggestionsDiv.classList.add('suggestions');
+                        suggestions.forEach(suggestion => {
+                            const text = suggestion.match(/\[suggestion:(.*?)\]/)[1];
+                            const chip = document.createElement('div');
+                            chip.classList.add('suggestion-chip');
+                            chip.textContent = text;
+                            chip.addEventListener('click', () => {
+                                messageInput.value = text;
+                                sendMessage(text);
+                            });
+                            suggestionsDiv.appendChild(chip);
+                        });
+                        contentElement.appendChild(suggestionsDiv);
+                    }
+                } else {
+                    contentElement.textContent = message;
+                }
+
+                const timestampElement = document.createElement('div');
+                timestampElement.classList.add('message-timestamp');
+                timestampElement.textContent = formatTimestamp();
+
+                messageElement.appendChild(contentElement);
+                messageElement.appendChild(timestampElement);
                 
                 // Insert before typing indicator
                 chatMessages.insertBefore(messageElement, typingIndicator);
@@ -159,7 +420,13 @@
                     // Show typing indicator
                     typingIndicator.style.display = 'block';
                     
-                    const response = await fetch('/api/message/', {
+                    // Include product ID in URL if available
+                    let url = '/api/message/';
+                    if (productId) {
+                        url += `?product_id=${productId}`;
+                    }
+                    
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -175,14 +442,14 @@
                     if (response.ok) {
                         addMessage(data.response, false);
                     } else {
-                        addMessage('Sorry, there was an error processing your request.', false);
+                        addMessage('Sorry, there was an error processing your request. Please try again.', false);
                         console.error('Error:', data.error);
                     }
                 } catch (error) {
                     // Hide typing indicator
                     typingIndicator.style.display = 'none';
                     
-                    addMessage('Sorry, there was an error connecting to the server.', false);
+                    addMessage('Sorry, there was an error connecting to the server. Please check your connection and try again.', false);
                     console.error('Error:', error);
                 }
             }
@@ -199,7 +466,8 @@
 
             // Event listener for enter key
             messageInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
                     const message = messageInput.value.trim();
                     if (message) {
                         addMessage(message, true);
@@ -208,6 +476,36 @@
                     }
                 }
             });
+
+            // Event listener for suggestion chips
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('suggestion-chip')) {
+                    const message = e.target.textContent;
+                    messageInput.value = '';
+                    addMessage(message, true);
+                    sendMessage(message);
+                }
+            });
+
+            // Event listener for clear chat
+            clearChatButton.addEventListener('click', function() {
+                // Keep only the first bot message
+                while (chatMessages.children.length > 2) { // 2 because of typing indicator
+                    chatMessages.removeChild(chatMessages.children[1]);
+                }
+            });
+
+            // Auto-send initial message if provided
+            if ('{{ initial_message }}') {
+                setTimeout(() => {
+                    const message = messageInput.value.trim();
+                    if (message) {
+                        addMessage(message, true);
+                        messageInput.value = '';
+                        sendMessage(message);
+                    }
+                }, 1000);
+            }
         });
     </script>
 </body>

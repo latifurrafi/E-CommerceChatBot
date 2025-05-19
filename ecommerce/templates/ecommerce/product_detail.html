@@ -1,0 +1,313 @@
+{% extends 'ecommerce/base.html' %}
+
+{% block title %}{{ product.name }} - ShopSmart{% endblock %}
+
+{% block content %}
+    <!-- Breadcrumb -->
+    <nav class="text-sm mb-5">
+        <ol class="list-none p-0 flex flex-wrap">
+            <li class="flex items-center">
+                <a href="{% url 'ecommerce:home' %}" class="text-blue-600 hover:text-blue-800">Home</a>
+                <span class="mx-2 text-gray-400">/</span>
+            </li>
+            <li class="flex items-center">
+                <a href="{% url 'ecommerce:product_list_by_category' product.category.slug %}" class="text-blue-600 hover:text-blue-800">{{ product.category.name }}</a>
+                <span class="mx-2 text-gray-400">/</span>
+            </li>
+            <li class="text-gray-600">{{ product.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- Product Detail -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden p-6 mb-8">
+        <div class="flex flex-col md:flex-row -mx-4">
+            <!-- Product Image -->
+            <div class="md:w-2/5 px-4 mb-6 md:mb-0">
+                {% if product.image %}
+                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-auto rounded-lg">
+                {% else %}
+                    <div class="w-full h-64 bg-gray-200 flex items-center justify-center rounded-lg">
+                        <i class="fas fa-image text-gray-400 text-5xl"></i>
+                    </div>
+                {% endif %}
+
+                <!-- Product Images Gallery -->
+                <div class="grid grid-cols-4 gap-2 mt-4">
+                    {% for image in product.images.all %}
+                        <img src="{{ image.image.url }}" alt="{{ image.alt_text }}" class="w-full h-20 object-cover rounded cursor-pointer hover:opacity-75">
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Product Information -->
+            <div class="md:w-3/5 px-4">
+                <h1 class="text-3xl font-bold mb-2">{{ product.name }}</h1>
+                
+                <div class="mb-4">
+                    <span class="text-sm text-gray-500">SKU: {{ product.sku }}</span>
+                    <span class="mx-2 text-gray-300">|</span>
+                    <span class="text-sm text-gray-500">Category: <a href="{% url 'ecommerce:product_list_by_category' product.category.slug %}" class="text-blue-600 hover:text-blue-800">{{ product.category.name }}</a></span>
+                </div>
+
+                <div class="mb-4">
+                    {% if product.sale_price %}
+                        <span class="text-red-600 text-2xl font-bold">${{ product.sale_price }}</span>
+                        <span class="text-gray-500 line-through ml-2">${{ product.price }}</span>
+                        <span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded ml-2">Sale</span>
+                    {% else %}
+                        <span class="text-gray-800 text-2xl font-bold">${{ product.price }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="mb-6">
+                    <div class="flex items-center">
+                        <div class="text-yellow-400 flex">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star-half-alt"></i>
+                        </div>
+                        <span class="ml-2 text-gray-600">4.5 (24 reviews)</span>
+                    </div>
+                </div>
+                
+                <div class="prose max-w-none mb-6">
+                    <p>{{ product.description|linebreaks }}</p>
+                </div>
+                
+                <!-- Stock Status -->
+                <div class="mb-6">
+                    {% if product.stock > 0 %}
+                        <div class="text-green-600 flex items-center">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            <span>In Stock ({{ product.stock }} available)</span>
+                        </div>
+                    {% else %}
+                        <div class="text-red-600 flex items-center">
+                            <i class="fas fa-times-circle mr-2"></i>
+                            <span>Out of Stock</span>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Add to Cart Form -->
+                <form action="{% url 'ecommerce:add_to_cart' %}" method="post" class="mb-6">
+                    {% csrf_token %}
+                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                    
+                    <!-- Variations -->
+                    {% if variations %}
+                        <div class="mb-4">
+                            {% regroup variations by variation_type as variation_groups %}
+                            {% for group in variation_groups %}
+                                <div class="mb-3">
+                                    <label class="block text-gray-700 font-bold mb-2">{{ group.grouper|title }}:</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        {% for variation in group.list %}
+                                            <div class="relative">
+                                                <input type="radio" name="variation_{{ group.grouper }}" id="variation_{{ variation.id }}" value="{{ variation.id }}" class="absolute opacity-0" {% if forloop.first %}checked{% endif %}>
+                                                <label for="variation_{{ variation.id }}" class="cursor-pointer border rounded px-4 py-2 bg-white hover:bg-gray-100 peer-checked:border-blue-500 peer-checked:bg-blue-50">
+                                                    {{ variation.name }}
+                                                    {% if variation.price_adjustment != 0 %}
+                                                        {% if variation.price_adjustment > 0 %}
+                                                            <span class="text-sm text-gray-600">(+${{ variation.price_adjustment }})</span>
+                                                        {% else %}
+                                                            <span class="text-sm text-gray-600">(-${{ variation.price_adjustment }})</span>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </label>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Quantity -->
+                    <div class="mb-4">
+                        <label for="quantity" class="block text-gray-700 font-bold mb-2">Quantity:</label>
+                        <div class="flex items-center">
+                            <button type="button" class="quantity-btn bg-gray-200 text-gray-700 px-3 py-2 rounded-l" data-action="decrement">-</button>
+                            <input type="number" id="quantity" name="quantity" value="1" min="1" max="{{ product.stock }}" class="w-16 text-center py-2 border-y outline-none">
+                            <button type="button" class="quantity-btn bg-gray-200 text-gray-700 px-3 py-2 rounded-r" data-action="increment">+</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Add to Cart Button -->
+                    <div class="flex space-x-4">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg flex items-center {% if product.stock <= 0 %}opacity-50 cursor-not-allowed{% endif %}" {% if product.stock <= 0 %}disabled{% endif %}>
+                            <i class="fas fa-shopping-cart mr-2"></i>
+                            Add to Cart
+                        </button>
+                        <button type="button" class="border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 py-3 px-6 rounded-lg flex items-center">
+                            <i class="far fa-heart mr-2"></i>
+                            Wishlist
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Chat with AI About This Product -->
+                <div class="mt-6 border-t pt-6">
+                    <h3 class="text-lg font-bold mb-3">Have Questions About This Product?</h3>
+                    <button onclick="openChatbot()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg flex items-center w-fit">
+                        <i class="fas fa-robot mr-2"></i>
+                        Chat with AI Assistant
+                    </button>
+                    <p class="text-sm text-gray-600 mt-2">Our AI assistant can answer your questions about this product's features, compatibility, and more.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Tabs -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
+        <div class="border-b">
+            <ul class="flex flex-wrap -mb-px text-center" id="product-tabs" role="tablist">
+                <li class="mr-2">
+                    <button class="tab-btn active inline-block p-4 border-b-2 border-blue-600 rounded-t-lg" id="details-tab" data-tab="details">
+                        Details
+                    </button>
+                </li>
+                <li class="mr-2">
+                    <button class="tab-btn inline-block p-4 rounded-t-lg hover:text-gray-600 hover:border-b-2 hover:border-gray-300" id="reviews-tab" data-tab="reviews">
+                        Reviews
+                    </button>
+                </li>
+                <li class="mr-2">
+                    <button class="tab-btn inline-block p-4 rounded-t-lg hover:text-gray-600 hover:border-b-2 hover:border-gray-300" id="shipping-tab" data-tab="shipping">
+                        Shipping & Returns
+                    </button>
+                </li>
+            </ul>
+        </div>
+        <div class="p-6">
+            <div id="details" class="tab-content block">
+                <h3 class="text-xl font-bold mb-4">Product Details</h3>
+                <div class="prose max-w-none">
+                    <p>{{ product.description|linebreaks }}</p>
+                </div>
+            </div>
+            <div id="reviews" class="tab-content hidden">
+                <h3 class="text-xl font-bold mb-4">Customer Reviews</h3>
+                <p>No reviews yet. Be the first to review this product.</p>
+            </div>
+            <div id="shipping" class="tab-content hidden">
+                <h3 class="text-xl font-bold mb-4">Shipping & Return Policy</h3>
+                <h4 class="font-bold mt-4 mb-2">Shipping</h4>
+                <p>We offer free standard shipping on all orders over $50. Orders are typically processed within 1-2 business days.</p>
+                
+                <h4 class="font-bold mt-4 mb-2">Returns</h4>
+                <p>We accept returns within 30 days of delivery. Items must be in original condition with tags attached.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Related Products -->
+    {% if related_products %}
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold mb-6">You Might Also Like</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {% for product in related_products %}
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition">
+                        <a href="{% url 'ecommerce:product_detail' product.slug %}">
+                            {% if product.image %}
+                                <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-48 object-cover">
+                            {% else %}
+                                <div class="w-full h-48 bg-gray-200 flex items-center justify-center">
+                                    <i class="fas fa-image text-gray-400 text-4xl"></i>
+                                </div>
+                            {% endif %}
+                        </a>
+                        <div class="p-4">
+                            <a href="{% url 'ecommerce:product_detail' product.slug %}">
+                                <h3 class="font-bold text-lg hover:text-blue-600">{{ product.name }}</h3>
+                            </a>
+                            <p class="text-gray-600 text-sm mb-2">{{ product.description|truncatechars:60 }}</p>
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    {% if product.sale_price %}
+                                        <span class="text-red-600 font-bold">${{ product.sale_price }}</span>
+                                        <span class="text-gray-500 line-through text-sm ml-2">${{ product.price }}</span>
+                                    {% else %}
+                                        <span class="text-gray-800 font-bold">${{ product.price }}</span>
+                                    {% endif %}
+                                </div>
+                                <form action="{% url 'ecommerce:add_to_cart' %}" method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                                    <input type="hidden" name="quantity" value="1">
+                                    <button type="submit" class="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700" title="Add to Cart">
+                                        <i class="fas fa-cart-plus"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Quantity incrementer/decrementer
+    document.addEventListener('DOMContentLoaded', function() {
+        const quantityInput = document.getElementById('quantity');
+        const maxStock = parseInt(quantityInput.getAttribute('max'));
+        
+        document.querySelectorAll('.quantity-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const action = this.dataset.action;
+                const currentVal = parseInt(quantityInput.value);
+                
+                if (action === 'decrement' && currentVal > 1) {
+                    quantityInput.value = currentVal - 1;
+                } else if (action === 'increment' && currentVal < maxStock) {
+                    quantityInput.value = currentVal + 1;
+                }
+            });
+        });
+        
+        // Tab functionality
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const tabId = this.dataset.tab;
+                
+                // Remove active class from all buttons
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.classList.remove('border-blue-600');
+                    btn.classList.remove('border-b-2');
+                });
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                this.classList.add('border-blue-600');
+                this.classList.add('border-b-2');
+                
+                // Hide all tab contents
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
+                    content.classList.remove('block');
+                });
+                
+                // Show the selected tab content
+                document.getElementById(tabId).classList.remove('hidden');
+                document.getElementById(tabId).classList.add('block');
+            });
+        });
+    });
+
+function openChatbot() {
+    // Open chatbot in a new window/tab with product context
+    window.open(`{% url 'chat' %}?product={{ product.id }}`, 'chatbot', 'width=400,height=600');
+}
+</script>
+{% endblock %} 

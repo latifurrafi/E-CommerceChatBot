@@ -1,165 +1,173 @@
 import os
 import django
+from django.utils import timezone
+from django.utils.text import slugify
+import uuid
 import random
-from decimal import Decimal
+from faker import Faker
 
-# Set up Django environment
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "dbchatbot.settings")
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dbchatbot.settings')
 django.setup()
 
-from chatapp.models import Product, FAQ, Order, OrderItem
+from django.contrib.auth.models import User
+from django.db import models
+from django.core.exceptions import ObjectDoesNotExist
+from ecommerce.models import Category, Product, ProductImage, Variation, Cart, CartItem, Order, OrderItem  # Fixed import path
 
-def create_sample_products():
-    """Create sample products"""
-    products = [
-        {
-            'name': 'Smartphone X',
-            'description': 'Latest smartphone with 6.5 inch display, 128GB storage, and dual camera.',
-            'price': '699.99',
-            'sku': 'PHN-X-128'
-        },
-        {
-            'name': 'Laptop Pro',
-            'description': 'Powerful laptop with 16GB RAM, 512GB SSD, and dedicated graphics card.',
-            'price': '1299.99',
-            'sku': 'LPT-PRO-512'
-        },
-        {
-            'name': 'Wireless Earbuds',
-            'description': 'Premium wireless earbuds with noise cancellation and 8 hours battery life.',
-            'price': '129.99',
-            'sku': 'AUD-WL-NC'
-        },
-        {
-            'name': 'Smart Watch',
-            'description': 'Fitness tracker with heart rate monitor, GPS and 5-day battery life.',
-            'price': '199.99',
-            'sku': 'WCH-SMT-5D'
-        },
-        {
-            'name': 'Digital Camera',
-            'description': '24MP digital camera with 4K video recording and 30x optical zoom.',
-            'price': '549.99',
-            'sku': 'CAM-DIG-24MP'
-        }
-    ]
-    
-    for product_data in products:
-        Product.objects.create(
-            name=product_data['name'],
-            description=product_data['description'],
-            price=Decimal(product_data['price']),
-            sku=product_data['sku']
-        )
-    
-    print(f"Created {len(products)} products")
+fake = Faker()
 
-def create_sample_faqs():
-    """Create sample FAQs"""
-    faqs = [
-        {
-            'question': 'How long does shipping take?',
-            'answer': 'Standard shipping takes 3-5 business days. Express shipping takes 1-2 business days.',
-            'category': 'Shipping'
-        },
-        {
-            'question': 'What is your return policy?',
-            'answer': 'You can return items within 30 days of delivery for a full refund.',
-            'category': 'Returns'
-        },
-        {
-            'question': 'Do you ship internationally?',
-            'answer': 'Yes, we ship to most countries worldwide. International shipping typically takes 7-14 business days.',
-            'category': 'Shipping'
-        },
-        {
-            'question': 'How can I track my order?',
-            'answer': 'You can track your order by logging into your account or using the tracking number provided in your shipping confirmation email.',
-            'category': 'Orders'
-        },
-        {
-            'question': 'Are your products covered by warranty?',
-            'answer': 'Yes, all our electronic products come with a 1-year manufacturer warranty.',
-            'category': 'Warranty'
-        }
-    ]
-    
-    for faq_data in faqs:
-        FAQ.objects.create(
-            question=faq_data['question'],
-            answer=faq_data['answer'],
-            category=faq_data['category']
-        )
-    
-    print(f"Created {len(faqs)} FAQs")
+def create_users():
+    users = []
+    for i in range(10):
+        try:
+            user = User.objects.create_user(username=f'user{i}', email=fake.email(), password='password123')
+            users.append(user)
+        except:
+            try:
+                user = User.objects.get(username=f'user{i}')
+                users.append(user)
+            except User.DoesNotExist:
+                pass
+    return users
 
-def create_sample_orders():
-    """Create sample orders"""
-    # Get all products
-    products = list(Product.objects.all())
-    
-    # Customer data
-    customers = [
-        {'name': 'John Smith', 'email': 'john.smith@example.com'},
-        {'name': 'Sarah Johnson', 'email': 'sarah.j@example.com'},
-        {'name': 'Michael Brown', 'email': 'mbrown@example.com'},
-        {'name': 'Emily Wilson', 'email': 'emily.wilson@example.com'},
-        {'name': 'David Lee', 'email': 'david.lee@example.com'}
-    ]
-    
-    # Order statuses
-    statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
-    
-    # Create orders
-    for i in range(1, 11):  # Create 10 orders
-        # Select a random customer
-        customer = random.choice(customers)
-        
-        # Create order
-        order = Order.objects.create(
-            order_number=f'ORD-2023-{i:04d}',
-            customer_name=customer['name'],
-            customer_email=customer['email'],
-            status=random.choice(statuses),
-            total_amount=Decimal('0.00')  # Will be updated
+def create_categories():
+    categories_data = ['Electronics', 'Clothing', 'Books', 'Home Goods', 'Sports']
+    categories = []
+    for cat_name in categories_data:
+        category, created = Category.objects.get_or_create(name=cat_name)
+        category.description = fake.sentence()
+        category.save()
+        categories.append(category)
+    return categories
+
+def create_products(categories):
+    products = []
+    for i in range(20):
+        category = random.choice(categories)
+        name = f"Product {fake.unique.word().capitalize()}_{i}"
+        price = round(random.uniform(10, 500), 2)
+        sale_price = round(price * random.uniform(0.7, 0.9), 2) if random.random() < 0.4 else None
+
+        product, created = Product.objects.get_or_create(
+            category=category,
+            name=name,
+            defaults={
+                'description': fake.paragraph(nb_sentences=5),
+                'price': price,
+                'sale_price': sale_price,
+                'sku': fake.unique.ean13(),
+                'stock': random.randint(0, 200),
+                'is_active': random.choice([True, False]),
+                'is_featured': random.choice([True, False]),
+            }
         )
-        
-        # Add 1-3 random products to the order
-        num_items = random.randint(1, 3)
-        total_amount = Decimal('0.00')
-        
-        for _ in range(num_items):
+
+        products.append(product)
+
+        # Create product images
+        num_images = random.randint(1, 3)
+        for j in range(num_images):
+            ProductImage.objects.create(
+                product=product,
+                image='products/dummy.jpg',
+                alt_text=fake.sentence(nb_words=4),
+                is_primary=(j == 0),
+            )
+
+        # Create variations
+        variation_types = random.sample(Variation.VARIATION_TYPE_CHOICES, random.randint(1, 2))
+        for var_type, _ in variation_types:
+            Variation.objects.create(
+                product=product,
+                variation_type=var_type,
+                name=fake.word().capitalize(),
+                price_adjustment=round(random.uniform(-10, 20), 2),
+                stock=random.randint(0, 50),
+                is_active=True,
+            )
+
+    return products
+
+def create_carts(users, products):
+    carts = []
+    for i in range(15):
+        user = random.choice([None] + users)
+        cart = Cart.objects.create(user=user)
+        carts.append(cart)
+
+        # Add cart items
+        for _ in range(random.randint(1, 5)):
             product = random.choice(products)
             quantity = random.randint(1, 3)
-            item_price = product.price
-            
-            OrderItem.objects.create(
+            cart_item = CartItem.objects.create(cart=cart, product=product, quantity=quantity)
+
+            # Add variations
+            available_variations = Variation.objects.filter(product=product)
+            if available_variations.exists():
+                num_variations = min(random.randint(0, 2), len(available_variations))
+                if num_variations > 0:
+                    cart_item.variations.set(random.sample(list(available_variations), num_variations))
+
+    return carts
+
+def create_orders(users, products):
+    orders = []
+    for i in range(25):
+        user = random.choice(users)
+        first_name = fake.first_name()
+        last_name = fake.last_name()
+        total_price = round(random.uniform(50, 1000), 2)
+
+        order = Order.objects.create(
+            user=user,
+            first_name=first_name,
+            last_name=last_name,
+            email=fake.email(),
+            phone=fake.phone_number(),
+            address=fake.address(),
+            city=fake.city(),
+            state=fake.state_abbr(),
+            country=fake.country(),
+            zipcode=fake.zipcode(),
+            total_price=total_price,
+            payment_method=random.choice(['Credit Card', 'PayPal', 'Cash on Delivery']),
+            status=random.choice(['pending', 'processing', 'shipped', 'delivered', 'cancelled']),
+            ip=fake.ipv4(),
+            order_note=fake.sentence() if random.random() < 0.3 else None,
+        )
+
+        orders.append(order)
+
+        # Create order items
+        for _ in range(random.randint(1, 4)):
+            product = random.choice(products)
+            quantity = random.randint(1, 2)
+            price = product.sale_price if product.sale_price else product.price
+
+            order_item = OrderItem.objects.create(
                 order=order,
                 product=product,
                 quantity=quantity,
-                price=item_price
+                price=price,
             )
-            
-            total_amount += item_price * quantity
-        
-        # Update order total
-        order.total_amount = total_amount
-        order.save()
-    
-    print(f"Created 10 orders")
 
-def main():
-    """Create all sample data"""
-    # Check if data already exists
-    if Product.objects.exists() or FAQ.objects.exists() or Order.objects.exists():
-        print("Data already exists. Skipping sample data creation.")
-        return
-    
-    create_sample_products()
-    create_sample_faqs()
-    create_sample_orders()
-    
-    print("Sample data creation complete!")
+            # Add variations
+            available_variations = Variation.objects.filter(product=product)
+            if available_variations.exists():
+                num_variations = min(random.randint(0, 2), len(available_variations))
+                if num_variations > 0:
+                    order_item.variation.set(random.sample(list(available_variations), num_variations))
 
-if __name__ == "__main__":
-    main()
+    return orders
+
+def run_data_generation():
+    print("Starting data generation...")
+    users = create_users()
+    categories = create_categories()
+    products = create_products(categories)
+    create_carts(users, products)
+    create_orders(users, products)
+    print("Data generation completed successfully.")
+
+if __name__ == '__main__':
+    run_data_generation()

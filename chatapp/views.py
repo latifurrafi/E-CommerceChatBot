@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 import logging
+from ecommerce.models import Product  # Import Product model for integration
 
 from .chatbot_service import ChatbotService
 
@@ -31,7 +32,20 @@ def chat_view(request):
     if not initialize_chatbot():
         return render(request, 'error.html', {'error': 'Failed to initialize chatbot'})
     
-    return render(request, 'chat.html')
+    context = {}
+    
+    # Check if there's a product parameter in the query string
+    product_id = request.GET.get('product')
+    if product_id:
+        try:
+            product = Product.objects.get(pk=product_id)
+            context['product'] = product
+            context['initial_message'] = f"Hi, I'd like to know more about the {product.name}."
+        except (Product.DoesNotExist, ValueError):
+            # If product doesn't exist, ignore and show normal chat
+            pass
+    
+    return render(request, 'chat.html', context)
 
 @csrf_exempt
 def process_message(request):
@@ -44,18 +58,37 @@ def process_message(request):
     
     try:
         # Parse request body
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        data = json.loads(request.body)
         
         query = data.get('message', '').strip()
         
         if not query:
             return JsonResponse({'error': 'Empty message'}, status=400)
         
-        # Process the query
-        response = chatbot.process_query(query)
+        # Check for product context in the query parameters
+        product_id = request.GET.get('product_id')
+        product_context = None
+        
+        if product_id:
+            try:
+                product = Product.objects.get(pk=product_id)
+                product_context = {
+                    'id': product.id,
+                    'name': product.name,
+                    'description': product.description,
+                    'price': float(product.price),
+                    'category': product.category.name if product.category else None,
+                    'sku': product.sku,
+                    'stock': product.stock,
+                }
+                # Pass the product context to the chatbot
+                response = chatbot.process_query(query, product_context=product_context)
+            except (Product.DoesNotExist, ValueError):
+                # If product doesn't exist, proceed without context
+                response = chatbot.process_query(query)
+        else:
+            # Process the query normally
+            response = chatbot.process_query(query)
         
         # Ensure response is JSON serializable
         if not isinstance(response, (str, int, float, bool, list, dict)):
@@ -63,6 +96,8 @@ def process_message(request):
         
         return JsonResponse({'response': response})
     
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
     except Exception as e:
         logger.error(f"Error processing message: {e}", exc_info=True)
         return JsonResponse({

@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'chatapp',  # Add our chat application
+    'ecommerce',  # E-commerce application
 ]
 
 MIDDLEWARE = [
@@ -90,9 +91,15 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
+# Media files (User uploaded content)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Embedding directory
+EMBEDDING_DIR = os.path.join(BASE_DIR, 'embeddings')
 
 UNFOLD = {
     'ADMIN_FAVICON': 'path/to/favicon.ico',  # Optional
@@ -104,5 +111,13 @@ UNFOLD = {
         {'label': 'Orders', 'url': 'admin:chatapp_order_changelist'},
         {'label': 'Order Items', 'url': 'admin:chatapp_orderitem_changelist'},
         {'label': 'Embeddings', 'url': 'admin:chatapp_embedding_changelist'},
+        # E-commerce menu items
+        {'label': 'E-commerce', 'items': [
+            {'label': 'Categories', 'url': 'admin:ecommerce_category_changelist'},
+            {'label': 'Products', 'url': 'admin:ecommerce_product_changelist'},
+            {'label': 'Variations', 'url': 'admin:ecommerce_variation_changelist'},
+            {'label': 'Carts', 'url': 'admin:ecommerce_cart_changelist'},
+            {'label': 'Orders', 'url': 'admin:ecommerce_order_changelist'},
+        ]},
     ],
 }
