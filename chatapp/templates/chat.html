@@ -268,16 +268,19 @@
     </style>
 </head>
 <body>
-    <div class="chat-widget">
-        <button class="chat-button" id="chat-toggle">💬</button>
+    <!-- Chat Widget -->
+    <div class="chat-widget" 
+         data-product-id="{% if product %}{{ product.id }}{% endif %}"
+         data-initial-message="{% if initial_message %}{{ initial_message }}{% endif %}">
+        <button class="chat-button" id="chat-toggle" aria-label="Toggle chat">💬</button>
         <div class="chat-container" id="chat-container">
             <div class="chat-header">
                 <h2>AI Shopping Assistant</h2>
                 <div class="header-actions">
-                    <button id="clear-chat" style="background: none; border: none; color: white; cursor: pointer;">
+                    <button id="clear-chat" style="background: none; border: none; color: white; cursor: pointer;" aria-label="Clear chat">
                         Clear
                     </button>
-                    <button class="minimize-button" id="minimize-chat">−</button>
+                    <button class="minimize-button" id="minimize-chat" aria-label="Minimize chat">−</button>
                 </div>
             </div>
             <div class="chat-messages" id="chat-messages">
@@ -314,8 +317,11 @@
                 </div>
             </div>
             <div class="input-container">
-                <input type="text" id="message-input" placeholder="Ask me anything..." {% if initial_message %}value="{{ initial_message }}"{% endif %}>
-                <button id="send-button">Send</button>
+                <textarea id="message-input" placeholder="Ask me anything..." rows="1"></textarea>
+                <button id="send-button" disabled>
+                    <span class="loading-spinner" id="send-spinner"></span>
+                    <span>Send</span>
+                </button>
             </div>
         </div>
     </div>
@@ -330,9 +336,11 @@
             const chatMessages = document.getElementById('chat-messages');
             const typingIndicator = document.getElementById('typing-indicator');
             const clearChatButton = document.getElementById('clear-chat');
+            const chatWidget = document.querySelector('.chat-widget');
 
             // Store product ID if available
-            const productId = {% if product %}{{ product.id }}{% else %}null{% endif %};
+            const productId = chatWidget.dataset.productId || null;
+            const initialMessage = chatWidget.dataset.initialMessage || null;
 
             // Toggle chat visibility
             chatToggle.addEventListener('click', function() {
@@ -496,12 +504,11 @@
             });
 
             // Auto-send initial message if provided
-            if ('{{ initial_message }}') {
+            if (initialMessage) {
                 setTimeout(() => {
-                    const message = messageInput.value.trim();
+                    const message = initialMessage.trim();
                     if (message) {
                         addMessage(message, true);
-                        messageInput.value = '';
                         sendMessage(message);
                     }
                 }, 1000);

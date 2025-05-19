@@ -1,32 +1,27 @@
 import os
-import numpy as np
 import json
-from sentence_transformers import SentenceTransformer
-from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
 import logging
-from django.core.cache import cache
-from typing import List, Dict, Any
-import re
-from .data_handlers.query_router import QueryRouter
-from model_manager import ModelManager
+from sentence_transformers import SentenceTransformer
+from transformers import pipeline
+import numpy as np
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class ChatbotService:
     def __init__(self):
-        """Initialize the chatbot service"""
-        logger.info("Initializing chatbot service...")
-        self.query_router = QueryRouter()
-        self.model_manager = ModelManager()
-        
-        # Initialize product knowledge base
-        self.product_knowledge = {
-            'categories': {
+        """Initialize the chatbot service with necessary models and knowledge base"""
+        try:
+            # Initialize the sentence transformer model for semantic search
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            
+            # Initialize the text generation pipeline
+            self.generator = pipeline('text-generation', model='gpt2')
+            
+            # Initialize product knowledge base
+            self.product_knowledge = {
                 'electronics': {
-                    'description': 'Latest gadgets and electronic devices',
-                    'features': ['Warranty', 'Technical Support', 'Compatibility Guide'],
+                    'description': 'Electronic devices and accessories',
+                    'features': ['Warranty', 'Compatibility', 'Technical specifications'],
                     'common_questions': [
                         'What is the warranty period?',
                         'Is it compatible with my device?',
@@ -34,25 +29,27 @@ class ChatbotService:
                     ]
                 },
                 'clothing': {
-                    'description': 'Fashion and apparel for all seasons',
-                    'features': ['Size Guide', 'Care Instructions', 'Return Policy'],
+                    'description': 'Fashion and apparel items',
+                    'features': ['Size guide', 'Material', 'Care instructions'],
                     'common_questions': [
-                        'How do I find my size?',
-                        'What is the return policy?',
-                        'What are the care instructions?'
+                        'What sizes are available?',
+                        'What material is it made of?',
+                        'How should I care for this item?'
                     ]
                 },
                 'home': {
-                    'description': 'Home decor and furniture',
-                    'features': ['Assembly Guide', 'Dimensions', 'Material Info'],
+                    'description': 'Home and living products',
+                    'features': ['Dimensions', 'Assembly', 'Care instructions'],
                     'common_questions': [
                         'What are the dimensions?',
                         'Does it require assembly?',
-                        'What materials is it made of?'
+                        'How do I clean this item?'
                     ]
                 }
-            },
-            'common_queries': {
+            }
+            
+            # Common queries and responses
+            self.common_queries = {
                 'shipping': {
                     'questions': [
                         'How long does shipping take?',
@@ -60,9 +57,9 @@ class ChatbotService:
                         'Do you offer international shipping?'
                     ],
                     'responses': {
-                        'shipping_time': 'Standard shipping takes 3-5 business days. Express shipping is available for 1-2 business days delivery.',
-                        'shipping_cost': 'Shipping is free for orders over $50. Standard shipping costs $5.99, and express shipping costs $12.99.',
-                        'international': 'Yes, we ship to most countries. International shipping costs and delivery times vary by location.'
+                        'time': 'Standard shipping takes 3-5 business days.',
+                        'cost': 'Free shipping on orders over $50.',
+                        'international': 'Yes, we ship to most countries worldwide.'
                     }
                 },
                 'returns': {
@@ -72,159 +69,167 @@ class ChatbotService:
                         'How long do I have to return?'
                     ],
                     'responses': {
-                        'policy': 'We offer a 30-day return policy for most items. Items must be unused and in original packaging.',
-                        'process': 'To return an item, please contact our customer service or initiate a return through your account dashboard.',
-                        'timeframe': 'You have 30 days from the delivery date to initiate a return.'
+                        'policy': '30-day return policy for unused items in original packaging.',
+                        'process': 'Contact customer service to initiate a return.',
+                        'timeframe': 'You have 30 days from delivery to return items.'
                     }
                 }
             }
-        }
-        
-        logger.info("Chatbot service initialized successfully")
+            
+            logger.info("Chatbot service initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize chatbot service: {str(e)}")
+            raise
 
-    def process_query(self, query: str, product_context=None) -> str:
+    def process_query(self, query, product_id=None):
         """
         Process a user query and return a response
-        
         Args:
-            query: The user's query
-            product_context: Optional context about a product the user is asking about
+            query (str): The user's query
+            product_id (str, optional): The ID of the product being discussed
+        Returns:
+            str: The chatbot's response
         """
         try:
             # Clean the query
             query = query.strip().lower()
-            if not query:
-                return "Please ask a question or provide some details about what you'd like to know."
-
+            
             # Log the incoming query
             logger.info(f"Processing query: {query}")
             
-            # If we have product context, enhance the response with product details
+            # Get product context if available
+            product_context = self._get_product_context(product_id) if product_id else None
+            
+            # Process the query based on context
             if product_context:
-                logger.info(f"Query has product context: {product_context['name']}")
                 response = self._handle_product_query(query, product_context)
             else:
-                # Handle general queries
                 response = self._handle_general_query(query)
             
-            # Add relevant suggestions
-            suggestions = self._generate_suggestions(query, response, product_context)
-            if suggestions:
-                response += "\n\nYou might also want to know:\n" + "\n".join([f"- {s}" for s in suggestions])
+            # Generate suggestions based on the query
+            suggestions = self._generate_suggestions(query, product_context)
             
+            # Add suggestions to the response
+            if suggestions:
+                response += "\n\nYou might also want to know:\n" + "\n".join(f"- {s}" for s in suggestions)
+            
+            logger.info(f"Generated response: {response}")
             return response
-
+            
         except Exception as e:
-            logger.error(f"Error processing query: {e}", exc_info=True)
-            return "I apologize, but I encountered an error while processing your request. Please try again."
+            logger.error(f"Error processing query: {str(e)}")
+            return "I apologize, but I'm having trouble processing your request. Please try again."
 
-    def _handle_product_query(self, query: str, product_context: Dict) -> str:
+    def _get_product_context(self, product_id):
+        """Get product information from the database"""
+        try:
+            # TODO: Implement database query to get product details
+            # For now, return a mock product context
+            return {
+                'id': product_id,
+                'name': 'Sample Product',
+                'category': 'electronics',
+                'price': 99.99,
+                'stock': 10
+            }
+        except Exception as e:
+            logger.error(f"Error getting product context: {str(e)}")
+            return None
+
+    def _handle_product_query(self, query, product_context):
         """Handle queries about specific products"""
-        # Extract category information
-        category = product_context.get('category', '').lower()
-        category_info = self.product_knowledge['categories'].get(category, {})
-        
-        # Check for common product questions
-        if any(word in query for word in ['feature', 'spec', 'detail']):
-            return self._format_product_features(product_context, category_info)
-        elif any(word in query for word in ['price', 'cost']):
-            return self._format_product_price(product_context)
-        elif any(word in query for word in ['stock', 'available']):
-            return self._format_stock_info(product_context)
-        elif any(word in query for word in ['similar', 'like', 'related']):
-            return self._format_similar_products(product_context)
-        else:
-            # Generic product response
-            return self._format_generic_product_response(product_context, category_info)
+        try:
+            # Check for price-related queries
+            if any(word in query for word in ['price', 'cost', 'how much']):
+                return self._format_price_response(product_context)
+            
+            # Check for stock-related queries
+            if any(word in query for word in ['stock', 'available', 'in stock']):
+                return self._format_stock_response(product_context)
+            
+            # Check for feature-related queries
+            if any(word in query for word in ['feature', 'specification', 'what can it do']):
+                return self._format_features_response(product_context)
+            
+            # Default response
+            return f"I can tell you about {product_context['name']}. What would you like to know? You can ask about its price, features, or availability."
+            
+        except Exception as e:
+            logger.error(f"Error handling product query: {str(e)}")
+            return "I'm having trouble finding information about this product. Please try asking something else."
 
-    def _handle_general_query(self, query: str) -> str:
+    def _handle_general_query(self, query):
         """Handle general queries not related to specific products"""
-        # Check for shipping related queries
-        if any(word in query for word in ['shipping', 'delivery', 'ship']):
-            return self._format_shipping_info()
-        # Check for return related queries
-        elif any(word in query for word in ['return', 'refund', 'exchange']):
-            return self._format_return_info()
-        # Check for category related queries
-        elif any(word in query for word in ['category', 'type', 'kind']):
-            return self._format_category_info()
-        else:
-            return "I can help you with information about our products, shipping, returns, and more. What would you like to know?"
+        try:
+            # Check for shipping-related queries
+            if any(word in query for word in ['shipping', 'delivery', 'when will it arrive']):
+                return self._format_shipping_response()
+            
+            # Check for return-related queries
+            if any(word in query for word in ['return', 'refund', 'exchange']):
+                return self._format_return_response()
+            
+            # Check for category-related queries
+            for category, info in self.product_knowledge.items():
+                if category in query:
+                    return self._format_category_response(category, info)
+            
+            # Default response
+            return "I can help you with product information, shipping, returns, and more. What would you like to know?"
+            
+        except Exception as e:
+            logger.error(f"Error handling general query: {str(e)}")
+            return "I'm having trouble understanding your question. Could you please rephrase it?"
 
-    def _format_product_features(self, product: Dict, category_info: Dict) -> str:
-        """Format product features in a readable way"""
-        features = category_info.get('features', [])
-        return f"The {product['name']} comes with the following features:\n" + \
-               "\n".join([f"- {feature}" for feature in features]) + \
-               f"\n\n{product['description']}"
+    def _format_price_response(self, product_context):
+        """Format response for price-related queries"""
+        return f"The {product_context['name']} is priced at ${product_context['price']}."
 
-    def _format_product_price(self, product: Dict) -> str:
-        """Format product price information"""
-        return f"The {product['name']} is priced at ${product['price']}. " + \
-               "We offer various payment methods and financing options are available for eligible purchases."
+    def _format_stock_response(self, product_context):
+        """Format response for stock-related queries"""
+        if product_context['stock'] > 0:
+            return f"Yes, the {product_context['name']} is in stock. We have {product_context['stock']} units available."
+        return f"Sorry, the {product_context['name']} is currently out of stock."
 
-    def _format_stock_info(self, product: Dict) -> str:
-        """Format stock information"""
-        if product['stock'] > 0:
-            return f"Yes, the {product['name']} is currently in stock with {product['stock']} units available. " + \
-                   "You can add it to your cart and proceed with checkout."
-        else:
-            return f"I'm sorry, but the {product['name']} is currently out of stock. " + \
-                   "Would you like me to notify you when it becomes available?"
+    def _format_features_response(self, product_context):
+        """Format response for feature-related queries"""
+        category = product_context.get('category', 'general')
+        features = self.product_knowledge.get(category, {}).get('features', [])
+        return f"The {product_context['name']} comes with the following features:\n" + "\n".join(f"- {feature}" for feature in features)
 
-    def _format_similar_products(self, product: Dict) -> str:
-        """Format information about similar products"""
-        return f"I can help you find similar products to the {product['name']}. " + \
-               "Would you like me to show you items in the same category or with similar features?"
+    def _format_shipping_response(self):
+        """Format response for shipping-related queries"""
+        return "We offer free standard shipping on orders over $50. Orders are typically processed within 1-2 business days."
 
-    def _format_generic_product_response(self, product: Dict, category_info: Dict) -> str:
-        """Format a generic response about a product"""
-        return f"The {product['name']} is a {category_info.get('description', 'great product')}. " + \
-               f"{product['description']}\n\n" + \
-               "Would you like to know more about its features, price, or availability?"
+    def _format_return_response(self):
+        """Format response for return-related queries"""
+        return "We accept returns within 30 days of delivery. Items must be in original condition with tags attached."
 
-    def _format_shipping_info(self) -> str:
-        """Format shipping information"""
-        shipping_info = self.product_knowledge['common_queries']['shipping']['responses']
-        return f"Here's our shipping information:\n" + \
-               f"- {shipping_info['shipping_time']}\n" + \
-               f"- {shipping_info['shipping_cost']}\n" + \
-               f"- {shipping_info['international']}"
+    def _format_category_response(self, category, info):
+        """Format response for category-related queries"""
+        return f"{info['description']}\n\nCommon features include:\n" + "\n".join(f"- {feature}" for feature in info['features'])
 
-    def _format_return_info(self) -> str:
-        """Format return policy information"""
-        return_info = self.product_knowledge['common_queries']['returns']['responses']
-        return f"Here's our return policy:\n" + \
-               f"- {return_info['policy']}\n" + \
-               f"- {return_info['process']}\n" + \
-               f"- {return_info['timeframe']}"
-
-    def _format_category_info(self) -> str:
-        """Format category information"""
-        categories = self.product_knowledge['categories']
-        return "We offer products in the following categories:\n" + \
-               "\n".join([f"- {cat.title()}: {info['description']}" for cat, info in categories.items()])
-
-    def _generate_suggestions(self, query: str, response: str, product_context: Dict = None) -> List[str]:
-        """Generate relevant follow-up suggestions"""
-        suggestions = []
-        
-        if product_context:
-            # Add product-specific suggestions
-            category = product_context.get('category', '').lower()
-            category_info = self.product_knowledge['categories'].get(category, {})
-            suggestions.extend(category_info.get('common_questions', []))
-        else:
-            # Add general suggestions
-            if 'shipping' in query:
-                suggestions.extend(self.product_knowledge['common_queries']['shipping']['questions'])
-            elif 'return' in query:
-                suggestions.extend(self.product_knowledge['common_queries']['returns']['questions'])
+    def _generate_suggestions(self, query, product_context=None):
+        """Generate relevant follow-up suggestions based on the query"""
+        try:
+            suggestions = []
+            
+            if product_context:
+                # Add product-specific suggestions
+                category = product_context.get('category', 'general')
+                if category in self.product_knowledge:
+                    suggestions.extend(self.product_knowledge[category]['common_questions'])
             else:
+                # Add general suggestions
                 suggestions.extend([
                     "What are your best-selling products?",
-                    "How can I track my order?",
-                    "What payment methods do you accept?"
+                    "Do you offer international shipping?",
+                    "What is your return policy?"
                 ])
-        
-        return suggestions[:3]  # Limit to 3 suggestions
+            
+            return suggestions[:3]  # Return top 3 suggestions
+            
+        except Exception as e:
+            logger.error(f"Error generating suggestions: {str(e)}")
+            return []

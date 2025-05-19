@@ -151,7 +151,7 @@
                 <!-- Chat with AI About This Product -->
                 <div class="mt-6 border-t pt-6">
                     <h3 class="text-lg font-bold mb-3">Have Questions About This Product?</h3>
-                    <button onclick="openChatbot()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg flex items-center w-fit">
+                    <button onclick="openChatbot('{{ product.name }}')" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg flex items-center w-fit">
                         <i class="fas fa-robot mr-2"></i>
                         Chat with AI Assistant
                     </button>
@@ -250,6 +250,15 @@
         </div>
     {% endif %}
 
+    <div class="product-actions">
+        <button class="btn btn-primary" onclick="addToCart({{ product.id }})">
+            Add to Cart
+        </button>
+        <button class="btn btn-secondary" onclick="openChatbot('{{ product.name }}')">
+            Ask AI Assistant
+        </button>
+    </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -305,9 +314,20 @@
         });
     });
 
-function openChatbot() {
-    // Open chatbot in a new window/tab with product context
-    window.open(`{% url 'chat' %}?product={{ product.id }}`, 'chatbot', 'width=400,height=600');
+function openChatbot(productName) {
+    const chatWidget = document.querySelector('.chat-widget');
+    const chatContainer = document.getElementById('chat-container');
+    const chatToggle = document.getElementById('chat-toggle');
+    
+    // Set initial message
+    chatWidget.dataset.initialMessage = `Tell me about ${productName}`;
+    
+    // Show chat container
+    chatContainer.classList.add('active');
+    
+    // Focus on input
+    const messageInput = document.getElementById('message-input');
+    messageInput.focus();
 }
 </script>
 {% endblock %} 

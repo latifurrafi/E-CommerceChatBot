@@ -1,0 +1,55 @@
+{% load static %}
+
+<div class="chat-widget">
+    <!-- Chat Button -->
+    <button class="chat-button bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-colors" aria-label="Open chat">
+        <i class="fas fa-comments text-xl"></i>
+    </button>
+
+    <!-- Chat Container -->
+    <div class="chat-container">
+        <!-- Chat Header -->
+        <div class="chat-header flex justify-between items-center">
+            <div>
+                <h3 class="font-bold">AI Shopping Assistant</h3>
+                <p class="text-sm text-blue-100">How can I help you today?</p>
+            </div>
+            <button class="close-button text-white hover:text-blue-100" onclick="toggleChat()" aria-label="Close chat">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages">
+            <!-- Welcome Message -->
+            <div class="message bot-message">
+                Hello! I'm your AI shopping assistant. How can I help you today?
+            </div>
+
+            <!-- Initial Suggestions -->
+            <div class="suggestions mt-4">
+                <span class="suggestion-chip">What are your best sellers?</span>
+                <span class="suggestion-chip">Tell me about your shipping policy</span>
+                <span class="suggestion-chip">How do I track my order?</span>
+            </div>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="chat-input">
+            <div class="flex items-end gap-2">
+                <textarea 
+                    class="flex-1 border rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Type your message..."
+                    rows="1"
+                    style="min-height: 40px; max-height: 120px;"
+                ></textarea>
+                <button 
+                    class="send-button bg-blue-600 text-white rounded-lg p-2 hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Send message"
+                >
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div> 

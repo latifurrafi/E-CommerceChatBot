@@ -21,8 +21,8 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('shop/', include('ecommerce.urls')),
-    path('', include('chatapp.urls')),
+    path('', include('ecommerce.urls')),
+    path('chat/', include('chatapp.urls')),
 ]
 
 # Add media files URL during development
